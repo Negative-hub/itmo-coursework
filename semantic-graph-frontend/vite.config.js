@@ -13,4 +13,16 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vue: ["vue", "vue-router"],
+          cytoscape: ["cytoscape", "cytoscape-cose-bilkent"],
+        },
+      },
+    },
+  },
 });

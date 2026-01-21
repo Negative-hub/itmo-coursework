@@ -1,8 +1,9 @@
 version: '3.8'
 
 services:
-  semantic-graph-api:
+  backend:
     build: ./semantic-graph-api
+    container_name: semantic-graph-api
     ports:
       - "8000:8000"
     volumes:
@@ -11,3 +12,22 @@ services:
     environment:
     - PYTHONPATH=/app
     restart: unless-stopped
+    networks:
+      - semantic-network
+
+  frontend:
+    build: ./semantic-graph-frontend
+    container_name: semantic-graph-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    volumes:
+      - ./semantic-graph-frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    networks:
+      - semantic-network
+
+networks:
+  semantic-network:
+    driver: bridge
