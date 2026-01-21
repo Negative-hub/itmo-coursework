@@ -63,9 +63,9 @@ def init_database():
                 "source_url": "https://web.dev/lcp/"
             },
             {
-                "name": "Задержка первого ввода (First Input Delay, FID) / Взаимодействие с следующей отрисовкой (Interaction to Next Paint, INP)",
-                "description": "Метрики, измеряющие отзывчивость страницы на пользовательский ввод.",
-                "source_url": "https://web.dev/inp/"
+                "name": "Задержка первого ввода (First Input Delay, FID)",
+                "description": "Метрика, измеряющая время от первого взаимодействия пользователя до момента, когда браузер может начать обрабатывать обработчики событий.",
+                "source_url": "https://web.dev/fid/"
             },
             {
                 "name": "Дерево DOM (Document Object Model)",
@@ -102,23 +102,115 @@ def init_database():
         
         # Создаем связи между терминами
         relationships_data = [
-            {"parent": "Клиентский рендеринг (Client-Side Rendering, CSR)", "child": "Core Web Vitals", "type": "influences"},
-            {"parent": "Клиентский рендеринг (Client-Side Rendering, CSR)", "child": "Индексация", "type": "influences"},
-            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", "child": "Наибольшая содержательная отрисовка (Largest Contentful Paint, LCP)", "type": "improves"},
-            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", "child": "Индексация", "type": "improves"},
-            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", "child": "Гидрирование (Hydration)", "type": "requires"},
-            {"parent": "Гидрирование (Hydration)", "child": "Задержка первого ввода (First Input Delay, FID) / Взаимодействие с следующей отрисовкой (Interaction to Next Paint, INP)", "type": "influences"},
-            {"parent": "Предварительный рендеринг (Pre-rendering)", "child": "Статическая генерация сайта (Static Site Generation, SSG)", "type": "includes"},
-            {"parent": "Предварительный рендеринг (Pre-rendering)", "child": "Инкрементальная статическая регенерация (Incremental Static Regeneration, ISR)", "type": "includes"},
-            {"parent": "Статическая генерация сайта (Static Site Generation, SSG)", "child": "Производительность", "type": "improves"},
-            {"parent": "Инкрементальная статическая регенерация (Incremental Static Regeneration, ISR)", "child": "Статическая генерация сайта (Static Site Generation, SSG)", "type": "extends"},
-            {"parent": "Инкрементальная статическая регенерация (Incremental Static Regeneration, ISR)", "child": "Сервер (Backend Server / Node.js Server)", "type": "requires"},
-            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", "child": "Сервер (Backend Server / Node.js Server)", "type": "requires"},
-            {"parent": "Дерево DOM (Document Object Model)", "child": "Совокупное смещение макета (Cumulative Layout Shift, CLS)", "type": "influences"},
-            {"parent": "Индексация", "child": "Поисковая оптимизация (SEO)", "type": "affects"},
-            {"parent": "Core Web Vitals", "child": "Поисковая оптимизация (SEO)", "type": "affects"},
-            {"parent": "Статическая генерация сайта (Static Site Generation, SSG)", "child": "Первоначальная загрузка (First Load)", "type": "improves"},
-            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", "child": "Первоначальная загрузка (First Load)", "type": "improves"},
+            # Центральные стратегии рендеринга
+            {"parent": "Клиентский рендеринг (Client-Side Rendering, CSR)", 
+             "child": "Серверный рендеринг (Server-Side Rendering, SSR)", 
+             "type": "альтернатива"},
+            
+            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", 
+             "child": "Гидрирование (Hydration)", 
+             "type": "требует"},
+            
+            {"parent": "Предварительный рендеринг (Pre-rendering)", 
+             "child": "Серверный рендеринг (Server-Side Rendering, SSR)", 
+             "type": "включает"},
+            
+            {"parent": "Предварительный рендеринг (Pre-rendering)", 
+             "child": "Статическая генерация сайта (Static Site Generation, SSG)", 
+             "type": "включает"},
+            
+            {"parent": "Статическая генерация сайта (Static Site Generation, SSG)", 
+             "child": "Инкрементальная статическая регенерация (Incremental Static Regeneration, ISR)", 
+             "type": "расширяется до"},
+            
+            # Влияние на метрики производительности
+            {"parent": "Клиентский рендеринг (Client-Side Rendering, CSR)", 
+             "child": "Core Web Vitals", 
+             "type": "влияет на"},
+            
+            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", 
+             "child": "Наибольшая содержательная отрисовка (Largest Contentful Paint, LCP)", 
+             "type": "улучшает"},
+            
+            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", 
+             "child": "Первоначальная загрузка (First Load)", 
+             "type": "ускоряет"},
+            
+            {"parent": "Гидрирование (Hydration)", 
+             "child": "Задержка первого ввода (First Input Delay, FID)", 
+             "type": "влияет на"},
+            
+            {"parent": "Статическая генерация сайта (Static Site Generation, SSG)", 
+             "child": "Первоначальная загрузка (First Load)", 
+             "type": "ускоряет"},
+            
+            # Связи с DOM и визуальной стабильностью
+            {"parent": "Дерево DOM (Document Object Model)", 
+             "child": "Совокупное смещение макета (Cumulative Layout Shift, CLS)", 
+             "type": "влияет на"},
+            
+            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", 
+             "child": "Дерево DOM (Document Object Model)", 
+             "type": "создает"},
+            
+            {"parent": "Клиентский рендеринг (Client-Side Rendering, CSR)", 
+             "child": "Дерево DOM (Document Object Model)", 
+             "type": "манипулирует"},
+            
+            # SEO и индексация
+            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", 
+             "child": "Индексация (Search Engine Indexing)", 
+             "type": "улучшает"},
+            
+            {"parent": "Статическая генерация сайта (Static Site Generation, SSG)", 
+             "child": "Индексация (Search Engine Indexing)", 
+             "type": "улучшает"},
+            
+            {"parent": "Индексация (Search Engine Indexing)", 
+             "child": "Поисковая оптимизация (SEO)", 
+             "type": "влияет на"},
+            
+            {"parent": "Core Web Vitals", 
+             "child": "Поисковая оптимизация (SEO)", 
+             "type": "влияет на"},
+            
+            # Серверная инфраструктура
+            {"parent": "Серверный рендеринг (Server-Side Rendering, SSR)", 
+             "child": "Сервер (Backend Server / Node.js Server)", 
+             "type": "требует"},
+            
+            {"parent": "Инкрементальная статическая регенерация (Incremental Static Regeneration, ISR)", 
+             "child": "Сервер (Backend Server / Node.js Server)", 
+             "type": "требует"},
+            
+            # Дополнительные связи для полной связности
+            {"parent": "Core Web Vitals", 
+             "child": "Наибольшая содержательная отрисовка (Largest Contentful Paint, LCP)", 
+             "type": "включает"},
+            
+            {"parent": "Core Web Vitals", 
+             "child": "Задержка первого ввода (First Input Delay, FID)", 
+             "type": "включает"},
+            
+            {"parent": "Core Web Vitals", 
+             "child": "Совокупное смещение макета (Cumulative Layout Shift, CLS)", 
+             "type": "включает"},
+            
+            {"parent": "Первоначальная загрузка (First Load)", 
+             "child": "Наибольшая содержательная отрисовка (Largest Contentful Paint, LCP)", 
+             "type": "влияет на"},
+            
+            {"parent": "Клиентский рендеринг (Client-Side Rendering, CSR)", 
+             "child": "Задержка первого ввода (First Input Delay, FID)", 
+             "type": "влияет на"},
+            
+            {"parent": "Дерево DOM (Document Object Model)", 
+             "child": "Гидрирование (Hydration)", 
+             "type": "обрабатывается в"},
+            
+            {"parent": "Поисковая оптимизация (SEO)", 
+             "child": "Первоначальная загрузка (First Load)", 
+             "type": "зависит от"},
         ]
         
         for rel_data in relationships_data:
