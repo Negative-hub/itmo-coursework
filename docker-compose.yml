@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  semantic-graph-api:
+    build: ./semantic-graph-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./semantic-graph-api/instance:/app/instance
+      - ./semantic-graph-api/app:/app/app
+    environment:
+    - PYTHONPATH=/app
+    restart: unless-stopped
