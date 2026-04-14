@@ -1,21 +1,25 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Путь к базе данных SQLite
-DATABASE_URL = "sqlite:///./instance/database.db"
-
-# Создаем engine
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}  # Только для SQLite
+# URL базы данных читается из переменной окружения.
+# В Kubernetes она задаётся в манифесте Deployment через env.
+# Формат: postgresql://user:password@host:port/dbname
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://appuser:apppass@postgres-service:5432/termsdb"
 )
 
-# Создаем фабрику сессий
+# Создаём engine (без check_same_thread — это было нужно только для SQLite)
+engine = create_engine(DATABASE_URL)
+
+# Фабрика сессий
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Базовый класс для моделей
 Base = declarative_base()
+
 
 # Dependency для получения сессии БД
 def get_db():

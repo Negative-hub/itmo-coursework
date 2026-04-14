@@ -1,0 +1,129 @@
+# Deployment "blue" — текущая версия (v1.0.0)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webapp
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: webapp
+        color: blue
+    spec:
+      containers:
+        - name: webapp
+          image: cr.yandex/YOUR_REGISTRY_ID/semantic-graph-api:v1.0.0
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://appuser:apppass@postgres-service:5432/termsdb"
+            - name: REDIS_HOST
+              value: "redis-service"
+            - name: APP_VERSION
+              value: "1.0.0"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+# Deployment "green" — новая версия (v1.1.0)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webapp
+      color: green
+  template:
+    metadata:
+      labels:
+        app: webapp
+        color: green
+    spec:
+      containers:
+        - name: webapp
+          image: cr.yandex/YOUR_REGISTRY_ID/semantic-graph-api:v1.1.0
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://appuser:apppass@postgres-service:5432/termsdb"
+            - name: REDIS_HOST
+              value: "redis-service"
+            - name: APP_VERSION
+              value: "1.1.0"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+# Service — изначально указывает на blue.
+# Переключение: kubectl patch svc webapp-service -p '{"spec":{"selector":{"color":"green"}}}'
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-service
+spec:
+  selector:
+    app: webapp
+    color: blue
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webapp-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webapp-service
+                port:
+                  number: 80

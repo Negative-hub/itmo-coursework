@@ -1,40 +1,73 @@
+import os
+import json
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List
+import redis
 
 from app import routes, models, schemas
-from app.database import engine, get_db
+from app.database import engine, get_db, Base
 
-# Создаем таблицы
-models.Base.metadata.create_all(bind=engine)
+# Версия приложения — задаётся при деплое через переменную окружения.
+# По ней мы определяем, какая версия обслуживает запрос
+# (важно для Blue-Green и Canary стратегий).
+APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
 
-# Создаем приложение FastAPI
+# Подключение к Redis — хост задаётся через переменную окружения.
+REDIS_HOST = os.getenv("REDIS_HOST", "redis-service")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+
+# Время жизни кэша в секундах
+CACHE_TTL = 60
+
+# Создаём таблицы
+Base.metadata.create_all(bind=engine)
+
+# Создаём приложение FastAPI
 app = FastAPI(
     title="Semantic Graph API",
     description="API для семантического графа терминов веб-разработки",
-    version="1.0.0"
+    version=APP_VERSION
 )
 
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В продакшене замените на конкретные домены
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    return {
-        "message": "Semantic Graph API",
-        "endpoints": {
-            "terms": "/api/terms",
-            "term_by_id": "/api/terms/{id}",
-            "graph": "/api/graph"
-        }
-    }
+
+@app.get("/api/health")
+def health_check():
+    """
+    Эндпоинт проверки здоровья.
+    Проверяет доступность PostgreSQL и Redis.
+    Используется для:
+    - readiness/liveness probes в Kubernetes
+    - измерения Downtime в k6-сценариях
+    """
+    try:
+        # Проверяем PostgreSQL
+        db = next(get_db())
+        db.execute(text("SELECT 1"))
+        db.close()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"PostgreSQL недоступен: {e}")
+
+    try:
+        # Проверяем Redis
+        redis_client.ping()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Redis недоступен: {e}")
+
+    return {"status": "ok", "version": APP_VERSION}
+
 
 @app.get("/api/terms", response_model=List[schemas.Term])
 def read_terms(
@@ -43,72 +76,49 @@ def read_terms(
     db: Session = Depends(get_db)
 ):
     """
-    Получить список всех терминов с пагинацией
+    Получить список всех терминов.
+    Ответ кэшируется в Redis на 60 секунд.
     """
+    cache_key = f"terms:skip={skip}:limit={limit}"
+
+    # Пробуем взять из кэша
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    # Если кэша нет — идём в PostgreSQL
     terms = routes.get_terms(db, skip=skip, limit=limit)
+
+    # Сохраняем в кэш
+    terms_data = [schemas.Term.model_validate(t).model_dump() for t in terms]
+    redis_client.setex(cache_key, CACHE_TTL, json.dumps(terms_data))
+
     return terms
 
-@app.get("/api/terms/{term_id}", response_model=schemas.TermWithRelationships)
-def read_term(term_id: int, db: Session = Depends(get_db)):
+
+@app.post("/api/terms", response_model=schemas.Term, status_code=201)
+def create_term(term: schemas.TermCreate, db: Session = Depends(get_db)):
     """
-    Получить термин по ID со всеми связанными терминами
+    Создать новый термин.
+    После создания сбрасываем кэш Redis,
+    чтобы GET /api/terms вернул актуальные данные.
     """
-    db_term = routes.get_term(db, term_id=term_id)
-    if db_term is None:
-        raise HTTPException(status_code=404, detail="Термин не найден")
-    
-    # Получаем связи
-    relationships = routes.get_relationships_by_term(db, term_id)
-    
-    # Формируем ответ
-    term_dict = {
-        "id": db_term.id,
-        "name": db_term.name,
-        "description": db_term.description,
-        "source_url": db_term.source_url,
-        "influences": [],
-        "influenced_by": [],
-        "relationship_types": []
-    }
-    
-    # Собираем связанные термины
-    for rel in relationships:
-        if rel.parent_id == term_id:
-            # Текущий термин влияет на другой
-            influenced_term = routes.get_term(db, rel.child_id)
-            if influenced_term:
-                term_dict["influences"].append({
-                    "id": influenced_term.id,
-                    "name": influenced_term.name,
-                    "description": influenced_term.description,
-                    "source_url": influenced_term.source_url
-                })
-        elif rel.child_id == term_id:
-            # На текущий термин влияет другой
-            influencer_term = routes.get_term(db, rel.parent_id)
-            if influencer_term:
-                term_dict["influenced_by"].append({
-                    "id": influencer_term.id,
-                    "name": influencer_term.name,
-                    "description": influencer_term.description,
-                    "source_url": influencer_term.source_url
-                })
-        
-        term_dict["relationship_types"].append(rel.relationship_type)
-    
-    # Убираем дубликаты
-    term_dict["relationship_types"] = list(set(term_dict["relationship_types"]))
-    
-    return term_dict
+    db_term = routes.create_term(db, term)
+
+    # Инвалидируем кэш — удаляем все ключи, начинающиеся с "terms:"
+    for key in redis_client.scan_iter("terms:*"):
+        redis_client.delete(key)
+
+    return db_term
+
 
 @app.get("/api/graph", response_model=schemas.GraphResponse)
 def get_full_graph(db: Session = Depends(get_db)):
     """
-    Получить полный граф для визуализации в Cytoscape.js
+    Получить полный граф для визуализации.
     """
     terms, relationships = routes.get_full_graph(db)
-    
-    # Формируем узлы
+
     nodes = []
     for term in terms:
         nodes.append({
@@ -120,8 +130,7 @@ def get_full_graph(db: Session = Depends(get_db)):
                 "source_url": term.source_url
             }
         })
-    
-    # Формируем связи
+
     edges = []
     edge_id = 1
     for rel in relationships:
@@ -135,13 +144,14 @@ def get_full_graph(db: Session = Depends(get_db)):
             }
         })
         edge_id += 1
-    
+
     return {"nodes": nodes, "edges": edges}
+
 
 @app.on_event("startup")
 async def startup_event():
     """
-    Инициализация базы данных при старте приложения
+    Инициализация базы данных при старте приложения.
     """
-    from .init_db import init_database
+    from app.init_db import init_database
     init_database()

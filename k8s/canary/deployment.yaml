@@ -1,0 +1,164 @@
+# Deployment "stable" — текущая версия
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-stable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webapp
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: webapp
+        track: stable
+    spec:
+      containers:
+        - name: webapp
+          image: cr.yandex/YOUR_REGISTRY_ID/semantic-graph-api:v1.0.0
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://appuser:apppass@postgres-service:5432/termsdb"
+            - name: REDIS_HOST
+              value: "redis-service"
+            - name: APP_VERSION
+              value: "1.0.0"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+# Deployment "canary" — новая версия (получает часть трафика)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webapp
+      track: canary
+  template:
+    metadata:
+      labels:
+        app: webapp
+        track: canary
+    spec:
+      containers:
+        - name: webapp
+          image: cr.yandex/YOUR_REGISTRY_ID/semantic-graph-api:v1.1.0
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://appuser:apppass@postgres-service:5432/termsdb"
+            - name: REDIS_HOST
+              value: "redis-service"
+            - name: APP_VERSION
+              value: "1.1.0"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+# Service для stable-подов
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-stable-service
+spec:
+  selector:
+    app: webapp
+    track: stable
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+# Service для canary-подов
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-canary-service
+spec:
+  selector:
+    app: webapp
+    track: canary
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+# Основной Ingress — направляет трафик на stable
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webapp-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webapp-stable-service
+                port:
+                  number: 80
+---
+# Канареечный Ingress — направляет часть трафика на canary.
+# Вес (canary-weight) меняется скриптом: 10 → 25 → 50 → 75 → 100
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webapp-canary-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "10"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webapp-canary-service
+                port:
+                  number: 80
