@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: webapp
-          image: cr.yandex/YOUR_REGISTRY_ID/semantic-graph-api:latest
+          image: cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.0.0
           ports:
             - containerPort: 8000
           env:
