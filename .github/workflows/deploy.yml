@@ -1,0 +1,153 @@
+name: CI/CD Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: "Стратегия развёртывания"
+        required: true
+        type: choice
+        options:
+          - recreate
+          - rolling
+          - blue-green
+          - canary
+      image_tag:
+        description: "Тег Docker-образа (версия)"
+        required: true
+        default: "v1.1.0"
+
+env:
+  REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}
+  IMAGE_NAME: semantic-graph-api
+
+jobs:
+  build:
+    name: Сборка Docker-образа
+    runs-on: ubuntu-latest
+    steps:
+      - name: Клонирование репозитория
+        uses: actions/checkout@v4
+
+      - name: Авторизация в Yandex Container Registry
+        run: echo "${{ secrets.YC_SA_KEY }}" | docker login --username json_key --password-stdin cr.yandex
+
+      - name: Сборка образа
+        run: |
+          docker build --platform linux/amd64 \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} \
+            ./semantic-graph-api
+
+      - name: Загрузка образа в реестр
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
+
+  test:
+    name: Тесты
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Клонирование репозитория
+        uses: actions/checkout@v4
+
+      - name: Установка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Установка зависимостей
+        run: |
+          pip install -r semantic-graph-api/requirements.txt
+          pip install pytest httpx
+
+      - name: Запуск линтера
+        run: |
+          pip install flake8
+          flake8 semantic-graph-api/app/ --max-line-length=120 --ignore=E501
+
+  deploy:
+    name: "Деплой (${{ inputs.strategy }})"
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Клонирование репозитория
+        uses: actions/checkout@v4
+
+      - name: Установка kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Настройка kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Развёртывание базовых сервисов
+        run: |
+          kubectl apply -f k8s/base/postgres.yaml
+          kubectl apply -f k8s/base/redis.yaml
+          kubectl rollout status deployment/postgres --timeout=120s
+          kubectl rollout status deployment/redis --timeout=120s
+
+      - name: "Развёртывание приложения (${{ inputs.strategy }})"
+        run: |
+          export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}"
+
+          case "${{ inputs.strategy }}" in
+            recreate)
+              sed -i "s|cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.0.0|${IMAGE}|g" k8s/recreate/deployment.yaml
+              kubectl apply -f k8s/recreate/deployment.yaml
+              kubectl rollout status deployment/webapp --timeout=300s
+              ;;
+            rolling)
+              sed -i "s|cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.0.0|${IMAGE}|g" k8s/rolling/deployment.yaml
+              kubectl apply -f k8s/rolling/deployment.yaml
+              kubectl rollout status deployment/webapp --timeout=300s
+              ;;
+            blue-green)
+              sed -i "s|cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.1.0|${IMAGE}|g" k8s/blue-green/deployment.yaml
+              bash scripts/blue-green-deploy.sh
+              ;;
+            canary)
+              sed -i "s|cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.1.0|${IMAGE}|g" k8s/canary/deployment.yaml
+              bash scripts/canary-experiment.sh
+              ;;
+          esac
+
+  smoke-test:
+    name: Smoke-тест
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Установка kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Настройка kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Проверка доступности /api/health
+        run: |
+          INGRESS_IP=$(kubectl get ingress webapp-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+
+          if [ -z "$INGRESS_IP" ]; then
+            echo "Ingress IP не назначен, пробую через port-forward..."
+            kubectl port-forward svc/webapp-service 8080:80 &
+            sleep 5
+            INGRESS_IP="localhost:8080"
+          fi
+
+          echo "Проверяю http://${INGRESS_IP}/api/health ..."
+
+          for i in $(seq 1 10); do
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "http://${INGRESS_IP}/api/health" || echo "000")
+            echo "Попытка ${i}: HTTP ${RESPONSE}"
+            if [ "$RESPONSE" = "200" ]; then
+              echo "Smoke-тест пройден!"
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Smoke-тест ПРОВАЛЕН"
+          exit 1
