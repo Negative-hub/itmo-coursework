@@ -7,7 +7,7 @@ from sqlalchemy import text
 from typing import List
 import redis
 
-from app import routes, models, schemas
+from app import routes, schemas
 from app.database import engine, get_db, Base
 
 # Версия приложения — задаётся при деплое через переменную окружения.
