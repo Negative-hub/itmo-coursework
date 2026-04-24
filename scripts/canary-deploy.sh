@@ -18,7 +18,7 @@ kubectl rollout status deployment/webapp-canary --timeout=120s
 # 2. Постепенно увеличиваем вес
 for WEIGHT in 10 25 50 75 100; do
   echo "[Canary] Устанавливаю вес: ${WEIGHT}%"
-  kubectl annotate ingress webapp-canary-ingress \
+  kubectl annotate ingress webapp-ingress \
     nginx.ingress.kubernetes.io/canary-weight="$WEIGHT" --overwrite
 
   # Ждём 60 секунд, чтобы собрать метрики
@@ -34,7 +34,7 @@ for WEIGHT in 10 25 50 75 100; do
 
   if (( $(echo "$ERROR_RATE > $ERROR_THRESHOLD" | bc -l) )); then
     echo "[Canary] Error Rate ${ERROR_RATE}% > ${ERROR_THRESHOLD}%. ОТКАТ!"
-    kubectl delete --validate=false -f k8s/canary/deployment.yaml
+    kubectl delete -f k8s/canary/deployment.yaml
     exit 1
   fi
 done
