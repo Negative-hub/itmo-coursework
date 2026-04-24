@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Авторизация в Yandex Container Registry
-        run: echo "${{ secrets.YC_SA_KEY }}" | docker login --username json_key --password-stdin cr.yandex
+        run: echo '${{ secrets.YC_SA_KEY }}' | docker login --username json_key --password-stdin cr.yandex
 
       - name: Сборка образа
         run: |
