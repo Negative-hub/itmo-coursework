@@ -114,6 +114,8 @@ jobs:
             canary)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/canary/deployment.yaml
               sed -i "s|NEW_APP_VERSION|${APP_VERSION}|g" k8s/recreate/deployment.yaml
+              kubectl apply -f k8s/canary/deployment.yaml
+              kubectl rollout status deployment/webapp-canary --timeout=120s
               bash scripts/canary-experiment.sh
               ;;
           esac
