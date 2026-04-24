@@ -94,21 +94,25 @@ jobs:
 
           case "${{ inputs.strategy }}" in
             recreate)
-              sed -i "s|cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.0.0|${IMAGE}|g" k8s/recreate/deployment.yaml
+              sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/recreate/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
               kubectl apply -f k8s/recreate/deployment.yaml
               kubectl rollout status deployment/webapp --timeout=300s
               ;;
             rolling)
-              sed -i "s|cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.0.0|${IMAGE}|g" k8s/rolling/deployment.yaml
+              sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/rolling/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
               kubectl apply -f k8s/rolling/deployment.yaml
               kubectl rollout status deployment/webapp --timeout=300s
               ;;
             blue-green)
-              sed -i "s|cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.1.0|${IMAGE}|g" k8s/blue-green/deployment.yaml
+              sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/blue-green/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
               bash scripts/blue-green-deploy.sh
               ;;
             canary)
-              sed -i "s|cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.1.0|${IMAGE}|g" k8s/canary/deployment.yaml
+              sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/canary/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
               bash scripts/canary-experiment.sh
               ;;
           esac
@@ -128,7 +132,7 @@ jobs:
 
       - name: Проверка доступности /api/health
         run: |
-          INGRESS_IP=$(kubectl get ingress webapp-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+          INGRESS_IP="81.26.182.191"
 
           if [ -z "$INGRESS_IP" ]; then
             echo "Ingress IP не назначен, пробую через port-forward..."

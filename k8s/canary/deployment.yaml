@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: webapp
-          image: cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.0.0
+          image: cr.yandex/crpoga92uf84rdcjasq4/semantic-graph-api:v1.0.0
           ports:
             - containerPort: 8000
           env:
@@ -66,7 +66,7 @@ spec:
     spec:
       containers:
         - name: webapp
-          image: cr.yandex/crpnvt6ptd90a0a7130m/semantic-graph-api:v1.1.0
+          image: IMAGE_NAME
           ports:
             - containerPort: 8000
           env:
@@ -75,7 +75,7 @@ spec:
             - name: REDIS_HOST
               value: "redis-service"
             - name: APP_VERSION
-              value: "1.1.0"
+              value: NEW_APP_VERSION
           resources:
             requests:
               cpu: "100m"
