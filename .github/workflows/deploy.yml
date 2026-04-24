@@ -29,11 +29,8 @@ jobs:
       - name: Клонирование репозитория
         uses: actions/checkout@v4
 
-      - name: Login to Yandex Cloud Container Registry
-        id: login-cr
-        uses: yc-actions/yc-cr-login@v3
-        with:
-          yc-sa-id: ${{ secrets.YC_SA_KEY }}
+      - name: Авторизация в Yandex Container Registry
+        run: echo "${{ secrets.YC_SA_KEY }}" | docker login --username json_key --password-stdin cr.yandex
 
       - name: Сборка образа
         run: |
