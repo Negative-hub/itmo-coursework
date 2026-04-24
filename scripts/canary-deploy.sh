@@ -12,7 +12,7 @@ echo "=== Canary Deploy ==="
 
 # 1. Применяем манифест
 echo "[1] Разворачиваю canary..."
-kubectl apply --validate=false -f k8s/canary/deployment.yaml
+kubectl apply -f k8s/canary/deployment.yaml
 kubectl rollout status deployment/webapp-canary --timeout=120s
 
 # 2. Постепенно увеличиваем вес
