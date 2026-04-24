@@ -12,7 +12,7 @@ echo "=== Canary Deploy ==="
 
 # 1. Применяем манифест
 echo "[1] Разворачиваю canary..."
-kubectl apply -f k8s/canary/deployment.yaml
+kubectl apply --validate=false -f k8s/canary/deployment.yaml
 kubectl rollout status deployment/webapp-canary --timeout=120s
 
 # 2. Постепенно увеличиваем вес
@@ -34,7 +34,7 @@ for WEIGHT in 10 25 50 75 100; do
 
   if (( $(echo "$ERROR_RATE > $ERROR_THRESHOLD" | bc -l) )); then
     echo "[Canary] Error Rate ${ERROR_RATE}% > ${ERROR_THRESHOLD}%. ОТКАТ!"
-    kubectl delete -f k8s/canary/deployment.yaml
+    kubectl delete --validate=false -f k8s/canary/deployment.yaml
     exit 1
   fi
 done

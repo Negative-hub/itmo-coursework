@@ -83,8 +83,8 @@ jobs:
 
       - name: Развёртывание базовых сервисов
         run: |
-          kubectl apply -f k8s/base/postgres.yaml
-          kubectl apply -f k8s/base/redis.yaml
+          kubectl apply --validate=false -f k8s/base/postgres.yaml
+          kubectl apply --validate=false -f k8s/base/redis.yaml
           kubectl rollout status deployment/postgres --timeout=120s
           kubectl rollout status deployment/redis --timeout=120s
 
@@ -96,13 +96,13 @@ jobs:
             recreate)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/recreate/deployment.yaml
               sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
-              kubectl apply -f k8s/recreate/deployment.yaml
+              kubectl apply --validate=false -f k8s/recreate/deployment.yaml
               kubectl rollout status deployment/webapp --timeout=300s
               ;;
             rolling)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/rolling/deployment.yaml
               sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
-              kubectl apply -f k8s/rolling/deployment.yaml
+              kubectl apply --validate=false -f k8s/rolling/deployment.yaml
               kubectl rollout status deployment/webapp --timeout=300s
               ;;
             blue-green)

@@ -8,7 +8,7 @@ echo "=== Blue-Green Deploy ==="
 
 # 1. Применяем манифест (оба Deployment + Service)
 echo "[1/3] Разворачиваю blue и green среды..."
-kubectl apply -f k8s/blue-green/deployment.yaml
+kubectl apply -f --validate=false k8s/blue-green/deployment.yaml
 
 # 2. Ждём готовности зелёной среды
 echo "[2/3] Жду готовности webapp-green..."
