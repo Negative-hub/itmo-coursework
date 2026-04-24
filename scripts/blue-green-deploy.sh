@@ -12,7 +12,7 @@ kubectl apply -f k8s/blue-green/deployment.yaml
 
 # 2. Ждём готовности зелёной среды
 echo "[2/3] Жду готовности webapp-green..."
-kubectl rollout status deployment/webapp-green --timeout=120s
+kubectl rollout status deployment/webapp-green --timeout=180s
 
 # 3. Переключаем трафик на green
 echo "[3/3] Переключаю трафик на green..."
