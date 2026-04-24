@@ -18,7 +18,11 @@ APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
 # Подключение к Redis — хост задаётся через переменную окружения.
 REDIS_HOST = os.getenv("REDIS_HOST", "redis-service")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+redis_client = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=0,
+    decode_responses=True)
 
 # Время жизни кэша в секундах
 CACHE_TTL = 60
@@ -58,7 +62,9 @@ def health_check():
         db.execute(text("SELECT 1"))
         db.close()
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"PostgreSQL недоступен: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"PostgreSQL недоступен: {e}")
 
     try:
         # Проверяем Redis
