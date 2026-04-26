@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       strategy:
-        description: "Стратегия развёртывания"
+        description: "Стратегия развертывания"
         required: true
         type: choice
         options:
@@ -81,7 +81,7 @@ jobs:
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
 
-      - name: Развёртывание базовых сервисов
+      - name: Развертывание базовых сервисов
         run: |
           kubectl apply -f k8s/base/postgres.yaml
           kubectl apply -f k8s/base/redis.yaml
@@ -101,19 +101,19 @@ jobs:
               ;;
             rolling)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/rolling/deployment.yaml
-              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/rolling/deployment.yaml
               kubectl apply -f k8s/rolling/deployment.yaml
               kubectl rollout status deployment/webapp --timeout=300s
               ;;
             blue-green)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/blue-green/deployment.yaml
-              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/blue-green/deployment.yaml
               bash scripts/blue-green-deploy.sh
               ;;
             canary)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/canary/deployment.yaml
-              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
-              bash scripts/canary-experiment.sh
+              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/canary/deployment.yaml
+              bash scripts/canary-deploy.sh
               ;;
           esac
 
