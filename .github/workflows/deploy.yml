@@ -83,36 +83,37 @@ jobs:
 
       - name: Развертывание базовых сервисов
         run: |
-          kubectl apply -f k8s/base/postgres.yaml
-          kubectl apply -f k8s/base/redis.yaml
+          kubectl apply --validate=false -f k8s/base/postgres.yaml
+          kubectl apply --validate=false -f k8s/base/redis.yaml
           kubectl rollout status deployment/postgres --timeout=120s
           kubectl rollout status deployment/redis --timeout=120s
 
       - name: "Развёртывание приложения (${{ inputs.strategy }})"
         run: |
           export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}"
+          export APP_VERSION="${{ inputs.image_tag }}"
 
           case "${{ inputs.strategy }}" in
             recreate)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/recreate/deployment.yaml
-              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/recreate/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${APP_VERSION}|g" k8s/recreate/deployment.yaml
               kubectl apply -f k8s/recreate/deployment.yaml
               kubectl rollout status deployment/webapp --timeout=300s
               ;;
             rolling)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/rolling/deployment.yaml
-              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/rolling/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${APP_VERSION}|g" k8s/rolling/deployment.yaml
               kubectl apply -f k8s/rolling/deployment.yaml
               kubectl rollout status deployment/webapp --timeout=300s
               ;;
             blue-green)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/blue-green/deployment.yaml
-              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/blue-green/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${APP_VERSION}|g" k8s/blue-green/deployment.yaml
               bash scripts/blue-green-deploy.sh
               ;;
             canary)
               sed -i "s|IMAGE_NAME|${IMAGE}|g" k8s/canary/deployment.yaml
-              sed -i "s|NEW_APP_VERSION|${image_tag}|g" k8s/canary/deployment.yaml
+              sed -i "s|NEW_APP_VERSION|${APP_VERSION}|g" k8s/canary/deployment.yaml
               bash scripts/canary-deploy.sh
               ;;
           esac

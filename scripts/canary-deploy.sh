@@ -12,8 +12,10 @@ echo "Разворачиваю stable и canary среды..."
 kubectl apply -f k8s/canary/deployment.yaml
 kubectl rollout status deployment/webapp-canary --timeout=120s
 
-for WEIGHT in 25 50 75 100; do
-  kubectl annotate ingress webapp-canary-ingress \
+# 2. Постепенно увеличиваем вес
+for WEIGHT in 10 25 50 75 100; do
+  echo "[Canary] Устанавливаю вес: ${WEIGHT}%"
+  kubectl annotate ingress webapp-ingress \
     nginx.ingress.kubernetes.io/canary-weight="$WEIGHT" --overwrite
   echo "[Canary] Вес: ${WEIGHT}% — $(date)"
   
