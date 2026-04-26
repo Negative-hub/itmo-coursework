@@ -83,12 +83,12 @@ jobs:
 
       - name: Развертывание базовых сервисов
         run: |
-          kubectl apply --validate=false -f k8s/base/postgres.yaml
-          kubectl apply --validate=false -f k8s/base/redis.yaml
+          kubectl apply -f k8s/base/postgres.yaml
+          kubectl apply -f k8s/base/redis.yaml
           kubectl rollout status deployment/postgres --timeout=120s
           kubectl rollout status deployment/redis --timeout=120s
 
-      - name: "Развёртывание приложения (${{ inputs.strategy }})"
+      - name: "Развертывание приложения (${{ inputs.strategy }})"
         run: |
           export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}"
           export APP_VERSION="${{ inputs.image_tag }}"
