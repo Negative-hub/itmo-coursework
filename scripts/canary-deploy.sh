@@ -10,7 +10,7 @@ echo "DEPLOY START: $(date)"
 
 echo "Разворачиваю stable и canary среды..."
 kubectl apply -f k8s/canary/deployment.yaml
-kubectl rollout status deployment/webapp-canary --timeout=120s
+kubectl rollout status deployment/webapp-canary --timeout=180s
 
 # 2. Постепенно увеличиваем вес
 for WEIGHT in 10 25 50 75 100; do
