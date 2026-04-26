@@ -135,13 +135,6 @@ jobs:
         run: |
           INGRESS_IP="81.26.182.191"
 
-          if [ -z "$INGRESS_IP" ]; then
-            echo "Ingress IP не назначен, пробую через port-forward..."
-            kubectl port-forward svc/webapp-service 8080:80 &
-            sleep 5
-            INGRESS_IP="localhost:8080"
-          fi
-
           echo "Проверяю http://${INGRESS_IP}/api/health ..."
 
           for i in $(seq 1 10); do
